@@ -1,12 +1,48 @@
 {
   "pins" : [
     {
-      "identity" : "swifttui",
+      "identity" : "swift-cmark",
       "kind" : "remoteSourceControl",
-      "location" : "https://github.com/rensbreur/SwiftTUI",
+      "location" : "https://github.com/swiftlang/swift-cmark.git",
       "state" : {
-        "branch" : "main",
-        "revision" : "537133031bc2b2731048d00748c69700e1b48185"
+        "revision" : "5d9bdaa4228b381639fff09403e39a04926e2dbe",
+        "version" : "0.7.1"
+      }
+    },
+    {
+      "identity" : "swift-displaywidth",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/ainame/swift-displaywidth.git",
+      "state" : {
+        "revision" : "e2bfbdf1469366483451708bca36511f4f48ddb1",
+        "version" : "0.0.3"
+      }
+    },
+    {
+      "identity" : "swift-markdown",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/apple/swift-markdown.git",
+      "state" : {
+        "revision" : "7d9a5ce307528578dfa777d505496bd5f544ad94",
+        "version" : "0.7.3"
+      }
+    },
+    {
+      "identity" : "swift-system",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/apple/swift-system.git",
+      "state" : {
+        "revision" : "7c6ad0fc39d0763e0b699210e4124afd5041c5df",
+        "version" : "1.6.4"
+      }
+    },
+    {
+      "identity" : "tautui",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/steipete/TauTUI",
+      "state" : {
+        "revision" : "d30c095b65885adb7dc5042a9f5012e574cdc73b",
+        "version" : "0.1.5"
       }
     }
   ],
