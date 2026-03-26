@@ -17,8 +17,23 @@ A macOS terminal UI for managing multiple [Claude Code](https://claude.ai/code) 
 
 ## Installation
 
+### Homebrew (recommended)
+
 ```bash
-git clone https://github.com/<you>/aura-cli
+brew tap ihomway/tap
+brew install ihomway/tap/aura-cli
+```
+
+If macOS Gatekeeper blocks the binary on first run, remove the quarantine flag:
+
+```bash
+xattr -d com.apple.quarantine $(which aura-cli)
+```
+
+### Build from source
+
+```bash
+git clone https://github.com/ihomway/aura-cli
 cd aura-cli
 swift build -c release
 cp .build/release/aura-cli /usr/local/bin/aura-cli
