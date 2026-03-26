@@ -16,6 +16,8 @@ final class AppComponent: Component {
     let viewModel: AppViewModel
     /// Set by main.swift after TUI is created; called when local UI state changes.
     var requestRender: () -> Void = {}
+    /// Set by main.swift; calls tui.stop() then exit(0) to restore terminal before quitting.
+    var onQuit: () -> Void = { exit(0) }
 
     // MARK: - List screen state
 
@@ -135,7 +137,7 @@ private extension AppComponent {
         case .key(.character("d"), _):
             deleteListSelection()
         case .key(.character("q"), _):
-            exit(0)
+            onQuit()
         default:
             break
         }
