@@ -15,12 +15,12 @@ let package = Package(
         .macOS(.v14)
     ],
     dependencies: [
-        .package(url: "https://github.com/rensbreur/SwiftTUI", branch: "main")
+        .package(url: "https://github.com/steipete/TauTUI", from: "0.1.5")
     ],
     targets: [
         .executableTarget(
             name: "aura-cli",
-            dependencies: ["SwiftTUI"],
+            dependencies: [.product(name: "TauTUI", package: "TauTUI")],
             path: "Sources/aura-cli"
         )
     ]
