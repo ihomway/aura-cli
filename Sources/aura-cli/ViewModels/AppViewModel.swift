@@ -7,13 +7,26 @@
 
 import Foundation
 
-final class AppViewModel: ObservableObject {
+final class AppViewModel {
 
-    @Published var currentScreen: AppScreen = .list
-    @Published var providers: [Provider] = []
-    @Published var activeProviderID: UUID? = nil
-    @Published var statusMessage: String = ""
-    @Published var duplicateWarning: DuplicateWarning? = nil
+    // Called after any state mutation — used to request a TUI re-render.
+    var onStateChange: () -> Void = {}
+
+    var currentScreen: AppScreen = .list {
+        didSet { onStateChange() }
+    }
+    var providers: [Provider] = [] {
+        didSet { onStateChange() }
+    }
+    var activeProviderID: UUID? = nil {
+        didSet { onStateChange() }
+    }
+    var statusMessage: String = "" {
+        didSet { onStateChange() }
+    }
+    var duplicateWarning: DuplicateWarning? = nil {
+        didSet { onStateChange() }
+    }
 
     private let store = ProviderStore.shared
     private let configManager = ConfigManager.shared
