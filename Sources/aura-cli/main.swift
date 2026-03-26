@@ -62,6 +62,10 @@ MainActor.assumeIsolated {
     appComponent.requestRender = {
         MainActor.assumeIsolated { tui.requestRender() }
     }
+    appComponent.onQuit = {
+        MainActor.assumeIsolated { tui.stop() }
+        exit(0)
+    }
 
     tui.addChild(appComponent)
     tui.setFocus(appComponent)
