@@ -6,7 +6,7 @@
 //
 
 import Foundation
-import SwiftTUI
+import TauTUI
 
 let version = "0.1.0"
 
@@ -32,8 +32,9 @@ if args.contains("--help") || args.contains("-h") {
 
     CONTROLS (interactive TUI):
         ↑ / ↓           Navigate between items
-        Enter           Activate / confirm selection
-        Tab             Move to next field
+        Enter           Activate / confirm / move to next field
+        Tab             Move to next field (in forms)
+        Esc             Go back / cancel
 
     CONFIGURATION:
         Providers are stored at ~/.claude/aura-providers.json
@@ -42,12 +43,35 @@ if args.contains("--help") || args.contains("-h") {
     exit(0)
 }
 
-// Run startup sync before launching the TUI
+// Run startup sync before launching the TUI (nonisolated file I/O)
 ConfigImportService.shared.syncOnStartup()
 
-// Create ViewModel outside the view tree (no @StateObject in SwiftTUI)
-let viewModel = AppViewModel()
+// Build the TUI on the main actor.
+// MainActor.assumeIsolated is safe here: top-level main.swift always runs on the main thread.
+MainActor.assumeIsolated {
+    let terminal = ProcessTerminal()
+    let tui = TUI(terminal: terminal)
 
-// Launch TUI
-let app = Application(rootView: RootView(viewModel: viewModel))
-app.start()
+    let viewModel = AppViewModel()
+    let appComponent = AppComponent(viewModel: viewModel)
+
+    // Wire callbacks — both called from main-thread callbacks, so assumeIsolated is safe.
+    viewModel.onStateChange = {
+        MainActor.assumeIsolated { tui.requestRender() }
+    }
+    appComponent.requestRender = {
+        MainActor.assumeIsolated { tui.requestRender() }
+    }
+
+    tui.addChild(appComponent)
+    tui.setFocus(appComponent)
+
+    do {
+        try tui.start()
+    } catch {
+        fputs("aura-cli: failed to start TUI: \(error)\n", stderr)
+        exit(1)
+    }
+}
+
+RunLoop.main.run()
