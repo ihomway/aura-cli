@@ -138,6 +138,7 @@ final class ProviderStore {
         if h.contains("bigmodel.cn") { return "ZhipuLogo" }
         if h.contains("z.ai") { return "ZaiLogo" }
         if h.contains("moonshot.cn") { return "MoonshotLogo" }
+        if h.contains("minimaxi.com") { return "OtherLogo" }
         return "OtherLogo"
     }
 }

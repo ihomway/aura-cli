@@ -113,6 +113,20 @@ struct ProviderTemplate: Hashable, Equatable {
         icon: "MoonshotLogo"
     )
 
+    static let minimax = ProviderTemplate(
+        name: "MiniMax",
+        envVariables: [
+            "ANTHROPIC_BASE_URL": "https://api.minimaxi.com/anthropic",
+            "ANTHROPIC_AUTH_TOKEN": "",
+            "ANTHROPIC_DEFAULT_HAIKU_MODEL": "MiniMax-M2.7",
+            "ANTHROPIC_DEFAULT_SONNET_MODEL": "MiniMax-M2.7",
+            "ANTHROPIC_DEFAULT_OPUS_MODEL": "MiniMax-M2.7",
+            "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1",
+            "API_TIMEOUT_MS": "3000000"
+        ],
+        icon: "OtherLogo"
+    )
+
     static let other = ProviderTemplate(
         name: "Other",
         envVariables: [
@@ -126,7 +140,7 @@ struct ProviderTemplate: Hashable, Equatable {
     )
 
     static let allTemplates: [ProviderTemplate] = [
-        .anthropic, .zhipuAI, .zai, .moonshotAI, .other
+        .anthropic, .zhipuAI, .zai, .moonshotAI, .minimax, .other
     ]
 }
 
