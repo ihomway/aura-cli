@@ -31,14 +31,41 @@ final class AppComponent: Component {
 
     // MARK: - Form screen state  (shared for add / edit)
 
-    /// 0 name, 1 url, 2 token, 3 haiku, 4 sonnet, 5 opus, 6 disable_traffic, 7 timeout, 8 [Save], 9 [Back]
+    /// Indices 0–7: name, url, token, haiku, sonnet, opus, disable_traffic, timeout.
+    /// Indices 8...(8+extraEnvVars.count-1): extra env-var value fields.
+    /// addEnvVarIndex: [+ Add env var] button.
+    /// saveIndex: [Save]. backIndex: [Back].
     private var formFieldIndex: Int = 0
     private var formValues: [String] = Array(repeating: "", count: 8)
+
+    /// Extra env variables beyond the 8 core fields.
+    private var extraEnvVars: [(key: String, value: String)] = []
+
+    private var addEnvVarIndex: Int { 8 + extraEnvVars.count }
+    private var saveIndex: Int      { 8 + extraEnvVars.count + 1 }
+    private var backIndex: Int      { 8 + extraEnvVars.count + 2 }
+
+    /// Core env-var keys always shown as the 7 dedicated form fields.
+    private static let coreEnvVarKeys: Set<String> = [
+        "ANTHROPIC_BASE_URL",
+        "ANTHROPIC_AUTH_TOKEN",
+        "ANTHROPIC_DEFAULT_HAIKU_MODEL",
+        "ANTHROPIC_DEFAULT_SONNET_MODEL",
+        "ANTHROPIC_DEFAULT_OPUS_MODEL",
+        "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC",
+        "API_TIMEOUT_MS"
+    ]
 
     // MARK: - Delete-confirm screen state
 
     /// 0 = [Yes, Delete], 1 = [Cancel]
     private var deleteActionIndex: Int = 0
+
+    // MARK: - Env-var picker screen state
+
+    private var pickerCategoryIndex: Int = 0
+    private var pickerItemIndex: Int = 0
+    private var pickerOriginScreen: AppScreen = .list
 
     // MARK: - Init
 
@@ -60,6 +87,8 @@ final class AppComponent: Component {
             return renderForm(width: width, title: "Edit Provider: \(provider.name)")
         case .deleteConfirm(let provider):
             return renderDeleteConfirm(width: width, provider: provider)
+        case .envVarPicker:
+            return renderEnvVarPicker(width: width)
         }
     }
 
@@ -77,6 +106,8 @@ final class AppComponent: Component {
             handleForm(input: input)
         case .deleteConfirm(let provider):
             handleDeleteConfirm(input: input, provider: provider)
+        case .envVarPicker:
+            handleEnvVarPicker(input: input)
         }
     }
 }
@@ -225,6 +256,11 @@ private extension AppComponent {
         formValues[5] = template.envVariables["ANTHROPIC_DEFAULT_OPUS_MODEL"] ?? ""
         formValues[6] = template.envVariables["CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC"] ?? ""
         formValues[7] = template.envVariables["API_TIMEOUT_MS"] ?? ""
+        // Load any template env vars beyond the 8 core fields
+        extraEnvVars = template.envVariables
+            .filter { !Self.coreEnvVarKeys.contains($0.key) }
+            .sorted { $0.key < $1.key }
+            .map { (key: $0.key, value: $0.value) }
     }
 
     func loadFormForEdit(provider: Provider) {
@@ -237,14 +273,21 @@ private extension AppComponent {
         formValues[5] = provider.envVariables["ANTHROPIC_DEFAULT_OPUS_MODEL"] ?? ""
         formValues[6] = provider.envVariables["CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC"] ?? ""
         formValues[7] = provider.envVariables["API_TIMEOUT_MS"] ?? ""
+        // Populate extra vars from keys beyond the core 7 env-var keys
+        extraEnvVars = provider.envVariables
+            .filter { !Self.coreEnvVarKeys.contains($0.key) }
+            .sorted { $0.key < $1.key }
+            .map { (key: $0.key, value: $0.value) }
     }
 
     func renderForm(width: Int, title: String) -> [String] {
+        let maxW = width - 6
         let sep = String(repeating: "─", count: min(width - 4, 46))
         var lines: [String] = []
         lines.append("  \(title)")
         lines.append("  \(sep)")
 
+        // Core 8 fields
         for i in 0..<8 {
             let label = Self.fieldLabels[i]
             let isFocused = formFieldIndex == i
@@ -260,6 +303,16 @@ private extension AppComponent {
             lines.append("  \(cursor) \(label) \(display)\(suffix)")
         }
 
+        // Extra env-var fields
+        for (i, ev) in extraEnvVars.enumerated() {
+            let fieldIdx = 8 + i
+            let isFocused = formFieldIndex == fieldIdx
+            let cursor = isFocused ? ">" : " "
+            let keyDisplay = ev.key.count > maxW - 12 ? String(ev.key.prefix(maxW - 12)) + "…" : ev.key
+            let suffix = isFocused ? "▌" : ""
+            lines.append("  \(cursor) \(keyDisplay): \(ev.value)\(suffix)")
+        }
+
         lines.append("  \(sep)")
 
         if let warning = viewModel.duplicateWarning {
@@ -270,8 +323,10 @@ private extension AppComponent {
             lines.append("  ↑↓ navigate  type to edit  Backspace delete  Enter next")
         }
 
-        let saveCursor = formFieldIndex == 8 ? ">" : " "
-        let backCursor = formFieldIndex == 9 ? ">" : " "
+        let addCursor  = formFieldIndex == addEnvVarIndex ? ">" : " "
+        let saveCursor = formFieldIndex == saveIndex ? ">" : " "
+        let backCursor = formFieldIndex == backIndex ? ">" : " "
+        lines.append("  \(addCursor) [+ Add env var]")
         lines.append("  \(saveCursor) [Save]   \(backCursor) [Back]")
         return lines
     }
@@ -282,7 +337,7 @@ private extension AppComponent {
             if formFieldIndex > 0 { formFieldIndex -= 1 }
             requestRender()
         case .key(.arrowDown, _), .key(.tab, _):
-            if formFieldIndex < 9 { formFieldIndex += 1 }
+            if formFieldIndex < backIndex { formFieldIndex += 1 }
             requestRender()
         case .key(.enter, _):
             if formFieldIndex < 7 {
@@ -291,15 +346,37 @@ private extension AppComponent {
             } else if formFieldIndex == 7 {
                 formFieldIndex = 8
                 requestRender()
-            } else if formFieldIndex == 8 {
+            } else if formFieldIndex < addEnvVarIndex {
+                // On an extra field — advance to next
+                formFieldIndex += 1
+                requestRender()
+            } else if formFieldIndex == addEnvVarIndex {
+                // Open the env-var picker
+                pickerOriginScreen = viewModel.currentScreen
+                pickerCategoryIndex = 0
+                pickerItemIndex = 0
+                viewModel.navigate(to: .envVarPicker)
+            } else if formFieldIndex == saveIndex {
                 submitForm()
             } else {
                 navigateBack()
             }
         case .key(.backspace, _), .key(.delete, _):
-            if formFieldIndex < 8 && !formValues[formFieldIndex].isEmpty {
-                formValues[formFieldIndex].removeLast()
-                requestRender()
+            if formFieldIndex < 8 {
+                if !formValues[formFieldIndex].isEmpty {
+                    formValues[formFieldIndex].removeLast()
+                    requestRender()
+                }
+            } else if formFieldIndex >= 8 && formFieldIndex < addEnvVarIndex {
+                let extraIdx = formFieldIndex - 8
+                if !extraEnvVars[extraIdx].value.isEmpty {
+                    extraEnvVars[extraIdx].value.removeLast()
+                    requestRender()
+                } else {
+                    extraEnvVars.remove(at: extraIdx)
+                    if formFieldIndex > 0 { formFieldIndex -= 1 }
+                    requestRender()
+                }
             }
         case .key(.escape, _):
             if viewModel.duplicateWarning != nil {
@@ -307,15 +384,25 @@ private extension AppComponent {
             } else {
                 navigateBack()
             }
-        case .key(.character(let c), _) where formFieldIndex < 8:
-            formValues[formFieldIndex].append(c)
+        case .key(.character(let c), _) where formFieldIndex < addEnvVarIndex:
+            if formFieldIndex < 8 {
+                formValues[formFieldIndex].append(c)
+            } else {
+                let extraIdx = formFieldIndex - 8
+                extraEnvVars[extraIdx].value.append(c)
+            }
             requestRender()
-        case .paste(let text) where formFieldIndex < 8:
+        case .paste(let text) where formFieldIndex < addEnvVarIndex:
             let sanitized = text
                 .replacingOccurrences(of: "\r\n", with: "")
                 .replacingOccurrences(of: "\n", with: "")
                 .replacingOccurrences(of: "\r", with: "")
-            formValues[formFieldIndex] += sanitized
+            if formFieldIndex < 8 {
+                formValues[formFieldIndex] += sanitized
+            } else {
+                let extraIdx = formFieldIndex - 8
+                extraEnvVars[extraIdx].value += sanitized
+            }
             requestRender()
         default:
             break
@@ -331,6 +418,9 @@ private extension AppComponent {
         if !formValues[5].isEmpty { env["ANTHROPIC_DEFAULT_OPUS_MODEL"] = formValues[5] }
         if !formValues[6].isEmpty { env["CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC"] = formValues[6] }
         if !formValues[7].isEmpty { env["API_TIMEOUT_MS"] = formValues[7] }
+        for ev in extraEnvVars where !ev.key.isEmpty {
+            env[ev.key] = ev.value
+        }
         return env
     }
 
@@ -378,6 +468,107 @@ private extension AppComponent {
             viewModel.navigate(to: .selectTemplate)
         default:
             viewModel.navigate(to: .list)
+        }
+    }
+}
+
+// MARK: - Env-Var Picker Screen
+
+private extension AppComponent {
+
+    private static let pickerCategories = ClaudeEnvCategory.allCases
+
+    /// Keys already configured in the form (core + extra).
+    private var presentEnvVarKeys: Set<String> {
+        var keys = Self.coreEnvVarKeys
+        extraEnvVars.forEach { keys.insert($0.key) }
+        return keys
+    }
+
+    func renderEnvVarPicker(width: Int) -> [String] {
+        let sep = String(repeating: "─", count: min(width - 4, 46))
+        var lines: [String] = []
+        lines.append("  Add Env Variable — Select Category & Key")
+        lines.append("  \(sep)")
+
+        // Tab bar: category names, selected wrapped in [...]
+        let tabBar = Self.pickerCategories.enumerated().map { idx, cat in
+            idx == pickerCategoryIndex ? "[\(cat.displayName)]" : cat.displayName
+        }.joined(separator: "  ")
+        lines.append("  \(tabBar)")
+        lines.append("  \(sep)")
+
+        // Items for current category
+        let category = Self.pickerCategories[pickerCategoryIndex]
+        let vars = ClaudeEnvVariable.variables(for: category)
+        let present = presentEnvVarKeys
+        let maxKeyW = max(10, min(width - 30, 42))
+
+        for (i, variable) in vars.enumerated() {
+            let isFocused = pickerItemIndex == i
+            let isPresent = present.contains(variable.name)
+            let cursor = isFocused ? ">" : " "
+            let keyDisplay: String
+            if variable.name.count > maxKeyW {
+                keyDisplay = String(variable.name.prefix(maxKeyW)) + "…"
+            } else {
+                keyDisplay = variable.name.padding(toLength: maxKeyW, withPad: " ", startingAt: 0)
+            }
+            let descMaxW = max(10, width - maxKeyW - 8)
+            let descDisplay: String
+            if variable.shortName.count > descMaxW {
+                descDisplay = String(variable.shortName.prefix(descMaxW)) + "…"
+            } else {
+                descDisplay = variable.shortName
+            }
+            let marker = isPresent ? "·" : " "
+            lines.append("  \(cursor) \(marker) \(keyDisplay)  \(descDisplay)")
+        }
+
+        if vars.isEmpty {
+            lines.append("  (no variables in this category)")
+        }
+
+        lines.append("  \(sep)")
+        lines.append("  ←→ category  ↑↓ item  Enter add  Esc cancel  · = already set")
+        return lines
+    }
+
+    func handleEnvVarPicker(input: TerminalInput) {
+        let categories = Self.pickerCategories
+        switch input {
+        case .key(.arrowLeft, _):
+            if pickerCategoryIndex > 0 {
+                pickerCategoryIndex -= 1
+                pickerItemIndex = 0
+            }
+            requestRender()
+        case .key(.arrowRight, _):
+            if pickerCategoryIndex < categories.count - 1 {
+                pickerCategoryIndex += 1
+                pickerItemIndex = 0
+            }
+            requestRender()
+        case .key(.arrowUp, _):
+            if pickerItemIndex > 0 { pickerItemIndex -= 1 }
+            requestRender()
+        case .key(.arrowDown, _):
+            let vars = ClaudeEnvVariable.variables(for: categories[pickerCategoryIndex])
+            if pickerItemIndex < vars.count - 1 { pickerItemIndex += 1 }
+            requestRender()
+        case .key(.enter, _):
+            let vars = ClaudeEnvVariable.variables(for: categories[pickerCategoryIndex])
+            guard !vars.isEmpty, pickerItemIndex < vars.count else { break }
+            let variable = vars[pickerItemIndex]
+            guard !presentEnvVarKeys.contains(variable.name) else { break }
+            let defaultVal = variable.defaultValue ?? ""
+            extraEnvVars.append((key: variable.name, value: defaultVal))
+            formFieldIndex = addEnvVarIndex - 1  // focus the newly added field
+            viewModel.navigate(to: pickerOriginScreen)
+        case .key(.escape, _):
+            viewModel.navigate(to: pickerOriginScreen)
+        default:
+            break
         }
     }
 }
