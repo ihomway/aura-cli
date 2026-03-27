@@ -31,9 +31,9 @@ final class AppComponent: Component {
 
     // MARK: - Form screen state  (shared for add / edit)
 
-    /// 0 name, 1 url, 2 token, 3 haiku, 4 sonnet, 5 opus, 6 [Save], 7 [Back]
+    /// 0 name, 1 url, 2 token, 3 haiku, 4 sonnet, 5 opus, 6 disable_traffic, 7 timeout, 8 [Save], 9 [Back]
     private var formFieldIndex: Int = 0
-    private var formValues: [String] = Array(repeating: "", count: 6)
+    private var formValues: [String] = Array(repeating: "", count: 8)
 
     // MARK: - Delete-confirm screen state
 
@@ -211,7 +211,8 @@ private extension AppComponent {
 
     private static let fieldLabels = [
         "Name:  ", "URL:   ", "Token: ",
-        "Haiku: ", "Sonnet:", "Opus:  "
+        "Haiku: ", "Sonnet:", "Opus:  ",
+        "NoTraf:", "Tmout: "
     ]
 
     func loadFormForAdd(template: ProviderTemplate) {
@@ -222,6 +223,8 @@ private extension AppComponent {
         formValues[3] = template.envVariables["ANTHROPIC_DEFAULT_HAIKU_MODEL"] ?? ""
         formValues[4] = template.envVariables["ANTHROPIC_DEFAULT_SONNET_MODEL"] ?? ""
         formValues[5] = template.envVariables["ANTHROPIC_DEFAULT_OPUS_MODEL"] ?? ""
+        formValues[6] = template.envVariables["CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC"] ?? ""
+        formValues[7] = template.envVariables["API_TIMEOUT_MS"] ?? ""
     }
 
     func loadFormForEdit(provider: Provider) {
@@ -232,6 +235,8 @@ private extension AppComponent {
         formValues[3] = provider.envVariables["ANTHROPIC_DEFAULT_HAIKU_MODEL"] ?? ""
         formValues[4] = provider.envVariables["ANTHROPIC_DEFAULT_SONNET_MODEL"] ?? ""
         formValues[5] = provider.envVariables["ANTHROPIC_DEFAULT_OPUS_MODEL"] ?? ""
+        formValues[6] = provider.envVariables["CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC"] ?? ""
+        formValues[7] = provider.envVariables["API_TIMEOUT_MS"] ?? ""
     }
 
     func renderForm(width: Int, title: String) -> [String] {
@@ -240,7 +245,7 @@ private extension AppComponent {
         lines.append("  \(title)")
         lines.append("  \(sep)")
 
-        for i in 0..<6 {
+        for i in 0..<8 {
             let label = Self.fieldLabels[i]
             let isFocused = formFieldIndex == i
             let cursor = isFocused ? ">" : " "
@@ -265,8 +270,8 @@ private extension AppComponent {
             lines.append("  ↑↓ navigate  type to edit  Backspace delete  Enter next")
         }
 
-        let saveCursor = formFieldIndex == 6 ? ">" : " "
-        let backCursor = formFieldIndex == 7 ? ">" : " "
+        let saveCursor = formFieldIndex == 8 ? ">" : " "
+        let backCursor = formFieldIndex == 9 ? ">" : " "
         lines.append("  \(saveCursor) [Save]   \(backCursor) [Back]")
         return lines
     }
@@ -277,22 +282,22 @@ private extension AppComponent {
             if formFieldIndex > 0 { formFieldIndex -= 1 }
             requestRender()
         case .key(.arrowDown, _), .key(.tab, _):
-            if formFieldIndex < 7 { formFieldIndex += 1 }
+            if formFieldIndex < 9 { formFieldIndex += 1 }
             requestRender()
         case .key(.enter, _):
-            if formFieldIndex < 5 {
+            if formFieldIndex < 7 {
                 formFieldIndex += 1
                 requestRender()
-            } else if formFieldIndex == 5 {
-                formFieldIndex = 6
+            } else if formFieldIndex == 7 {
+                formFieldIndex = 8
                 requestRender()
-            } else if formFieldIndex == 6 {
+            } else if formFieldIndex == 8 {
                 submitForm()
             } else {
                 navigateBack()
             }
         case .key(.backspace, _), .key(.delete, _):
-            if formFieldIndex < 6 && !formValues[formFieldIndex].isEmpty {
+            if formFieldIndex < 8 && !formValues[formFieldIndex].isEmpty {
                 formValues[formFieldIndex].removeLast()
                 requestRender()
             }
@@ -302,10 +307,10 @@ private extension AppComponent {
             } else {
                 navigateBack()
             }
-        case .key(.character(let c), _) where formFieldIndex < 6:
+        case .key(.character(let c), _) where formFieldIndex < 8:
             formValues[formFieldIndex].append(c)
             requestRender()
-        case .paste(let text) where formFieldIndex < 6:
+        case .paste(let text) where formFieldIndex < 8:
             let sanitized = text
                 .replacingOccurrences(of: "\r\n", with: "")
                 .replacingOccurrences(of: "\n", with: "")
@@ -324,6 +329,8 @@ private extension AppComponent {
         if !formValues[3].isEmpty { env["ANTHROPIC_DEFAULT_HAIKU_MODEL"] = formValues[3] }
         if !formValues[4].isEmpty { env["ANTHROPIC_DEFAULT_SONNET_MODEL"] = formValues[4] }
         if !formValues[5].isEmpty { env["ANTHROPIC_DEFAULT_OPUS_MODEL"] = formValues[5] }
+        if !formValues[6].isEmpty { env["CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC"] = formValues[6] }
+        if !formValues[7].isEmpty { env["API_TIMEOUT_MS"] = formValues[7] }
         return env
     }
 
