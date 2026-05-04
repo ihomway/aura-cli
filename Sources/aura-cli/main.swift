@@ -24,7 +24,10 @@ if args.contains("--help") || args.contains("-h") {
     A TUI for managing Claude Code API providers.
 
     USAGE:
-        aura-cli [OPTIONS]
+        aura-cli [COMMAND] [OPTIONS]
+
+    COMMANDS:
+        current          Print the active provider configuration as JSON
 
     OPTIONS:
         -h, --help       Print help information
@@ -40,6 +43,20 @@ if args.contains("--help") || args.contains("-h") {
         Providers are stored at ~/.claude/aura-providers.json
         Active provider is applied to ~/.claude/settings.json
     """)
+    exit(0)
+}
+
+if args.dropFirst().first == "current" {
+    struct DefaultOutput: Encodable { let name = "Default" }
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = .prettyPrinted
+    let output: Data
+    if let provider = ProviderStore.shared.activeProvider {
+        output = (try? encoder.encode(provider)) ?? Data()
+    } else {
+        output = (try? encoder.encode(DefaultOutput())) ?? Data()
+    }
+    print(String(decoding: output, as: UTF8.self))
     exit(0)
 }
 
