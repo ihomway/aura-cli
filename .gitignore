@@ -99,3 +99,5 @@ playground.xcworkspace
 .build
 .swiftpm
 .vscode
+.spectra/
+openspec/.vector-search.db*
