@@ -8,7 +8,7 @@
 import Foundation
 import TauTUI
 
-let version = "0.2.0"
+let version = "0.2.2"
 
 // Handle --version and --help flags before launching TUI
 let args = CommandLine.arguments
