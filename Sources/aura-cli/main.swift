@@ -28,6 +28,8 @@ if args.contains("--help") || args.contains("-h") {
 
     COMMANDS:
         current          Print the active provider configuration as JSON
+        switch <name>    Activate a provider by name
+        switch --off     Deactivate all providers (restore default)
 
     OPTIONS:
         -h, --help       Print help information
@@ -57,6 +59,55 @@ if args.dropFirst().first == "current" {
         output = (try? encoder.encode(DefaultOutput())) ?? Data()
     }
     print(String(decoding: output, as: UTF8.self))
+    exit(0)
+}
+
+if args.dropFirst().first == "switch" {
+    let switchArgs = Array(args.dropFirst(2))
+
+    if switchArgs.contains("--off") {
+        ConfigImportService.shared.syncOnStartup()
+        let wasActive = ProviderStore.shared.activeProvider != nil
+        ProviderStore.shared.deactivateAll()
+        ConfigManager.shared.clearEnvVariables()
+        if wasActive {
+            print("Switched to default (all providers deactivated)")
+        } else {
+            print("Already on default (no active provider)")
+        }
+        exit(0)
+    }
+
+    guard !switchArgs.isEmpty else {
+        fputs("Usage: aura-cli switch <name> | --off\n", stderr)
+        exit(1)
+    }
+
+    let name = switchArgs.joined(separator: " ")
+
+    ConfigImportService.shared.syncOnStartup()
+
+    let matches = ProviderStore.shared.providers.filter {
+        $0.name.lowercased() == name.lowercased()
+    }
+
+    if matches.isEmpty {
+        fputs("Error: no provider found matching \"\(name)\"\n", stderr)
+        exit(1)
+    }
+
+    if matches.count > 1 {
+        fputs("Error: multiple providers match \"\(name)\":\n", stderr)
+        for match in matches {
+            fputs("  - \(match.name)\n", stderr)
+        }
+        exit(1)
+    }
+
+    let provider = matches[0]
+    ProviderStore.shared.activateProvider(provider)
+    ConfigManager.shared.updateEnvVariables(provider.envVariables)
+    print("Switched to \"\(provider.name)\"")
     exit(0)
 }
 
