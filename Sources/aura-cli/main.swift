@@ -29,6 +29,7 @@ if args.contains("--help") || args.contains("-h") {
     COMMANDS:
         current          Print the active provider configuration as JSON
         switch <name>    Activate a provider by name
+        switch Default   Deactivate all providers (alias for --off)
         switch --off     Deactivate all providers (restore default)
 
     OPTIONS:
@@ -64,8 +65,9 @@ if args.dropFirst().first == "current" {
 
 if args.dropFirst().first == "switch" {
     let switchArgs = Array(args.dropFirst(2))
+    let reservedDefaultName = "Default"
 
-    if switchArgs.contains("--off") {
+    func deactivateAllAndExit() -> Never {
         ConfigImportService.shared.syncOnStartup()
         let wasActive = ProviderStore.shared.activeProvider != nil
         ProviderStore.shared.deactivateAll()
@@ -78,12 +80,23 @@ if args.dropFirst().first == "switch" {
         exit(0)
     }
 
+    if switchArgs.contains("--off") {
+        deactivateAllAndExit()
+    }
+
     guard !switchArgs.isEmpty else {
         fputs("Usage: aura-cli switch <name> | --off\n", stderr)
         exit(1)
     }
 
     let name = switchArgs.joined(separator: " ")
+
+    // Reserved name: matches what `aura-cli current` prints when no provider is
+    // active. Checked before the provider lookup so a user-created provider
+    // named "Default" cannot intercept this path.
+    if name.lowercased() == reservedDefaultName.lowercased() {
+        deactivateAllAndExit()
+    }
 
     ConfigImportService.shared.syncOnStartup()
 
